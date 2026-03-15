@@ -1,0 +1,31 @@
+[workspace]
+members = [
+    "rabbfn",
+    "rabbfn-macros",
+]
+resolver = "3"
+
+[workspace.package]
+authors = ["1149520393@qq.com"]
+edition = "2024"
+homepage = "https://www.soyue.top"
+repository = "https://www.soyue.top"
+license = "MIT OR Apache-2.0"
+rust-version = "1.85.0"
+
+[workspace.dependencies]
+
+
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'unwind'
+incremental = false
+overflow-checks = false
+
+
