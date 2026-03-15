@@ -9,6 +9,7 @@ use tower::util::BoxCloneService;
 use crate::config::{BindingConfig, QosConfig, QueueConfig, ExchangeConfig, ConsumeConfig, TopologyMode, ConsumerDefinition, IntoConsumerDefinition};
 use crate::state::StateStore;
 
+/// Runtime server that owns connection settings and registered consumers.
 pub struct RabbitMqServer {
     url: String,
     topology_mode: TopologyMode,
@@ -27,12 +28,14 @@ struct ConsumerDescriptor {
     service: BoxCloneService<MqRequest, (), Error>,
 }
 
+/// Fluent builder returned after registering a consumer.
 pub struct ConsumerChain {
     server: RabbitMqServer,
     consumer_index: usize,
 }
 
 impl RabbitMqServer {
+    /// Creates a server instance bound to the given AMQP URL.
     pub fn new(url: impl Into<String>) -> Self {
         Self {
             url: url.into(),
@@ -42,11 +45,13 @@ impl RabbitMqServer {
         }
     }
 
+    /// Sets topology handling mode for all registered consumers.
     pub fn with_topology_mode(mut self, mode: TopologyMode) -> Self {
         self.topology_mode = mode;
         self
     }
 
+    /// Inserts global shared state visible to all consumers.
     pub fn with_state<T>(mut self, state: T) -> Self
     where
         T: Send + Sync + 'static,
@@ -55,6 +60,9 @@ impl RabbitMqServer {
         self
     }
 
+    /// Registers one consumer definition.
+    ///
+    /// Returns a [`ConsumerChain`] for further per-consumer configuration.
     pub fn add_consumer<D>(mut self, definition: D) -> ConsumerChain
     where
         D: IntoConsumerDefinition,
@@ -66,6 +74,7 @@ impl RabbitMqServer {
         }
     }
 
+    /// Alias for [`RabbitMqServer::add_consumer`].
     pub fn add_service<D>(self, definition: D) -> ConsumerChain
     where
         D: IntoConsumerDefinition,
@@ -87,6 +96,7 @@ impl RabbitMqServer {
         self.consumers.len() - 1
     }
 
+    /// Connects to RabbitMQ, initializes topology when needed, and starts all consumers.
     pub async fn run(self) -> Result<(), Error> {
         let conn = Connection::connect(&self.url, ConnectionProperties::default()).await.map_err(Error::Amqp)?;
         let conn = Arc::new(conn);
@@ -224,6 +234,7 @@ impl RabbitMqServer {
 }
 
 impl ConsumerChain {
+    /// Inserts local state for the most recently registered consumer.
     pub fn with_state<T>(mut self, state: T) -> Self
     where
         T: Send + Sync + 'static,
@@ -234,6 +245,7 @@ impl ConsumerChain {
         self
     }
 
+    /// Inserts global shared state for all consumers.
     pub fn with_server_state<T>(mut self, state: T) -> Self
     where
         T: Send + Sync + 'static,
@@ -242,11 +254,13 @@ impl ConsumerChain {
         self
     }
 
+    /// Sets topology handling mode on the underlying server.
     pub fn with_topology_mode(mut self, mode: TopologyMode) -> Self {
         self.server.topology_mode = mode;
         self
     }
 
+    /// Registers another consumer and moves the chain context to it.
     pub fn add_consumer<D>(mut self, definition: D) -> Self
     where
         D: IntoConsumerDefinition,
@@ -255,6 +269,7 @@ impl ConsumerChain {
         self
     }
 
+    /// Alias for [`ConsumerChain::add_consumer`].
     pub fn add_service<D>(self, definition: D) -> Self
     where
         D: IntoConsumerDefinition,
@@ -262,6 +277,7 @@ impl ConsumerChain {
         self.add_consumer(definition)
     }
 
+    /// Consumes all registered definitions by delegating to [`RabbitMqServer::run`].
     pub async fn run(self) -> Result<(), Error> {
         self.server.run().await
     }

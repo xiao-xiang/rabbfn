@@ -18,7 +18,7 @@ rust-version = "1.85.0"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rabbfn-macros = { path = "rabbfn-macros" }
+rabbfn-macros = { version = "0.1.0", path = "rabbfn-macros" }
 async-trait = "0.1"
 futures = "0.3"
 thiserror = "1.0"
