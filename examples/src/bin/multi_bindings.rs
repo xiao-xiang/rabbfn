@@ -20,9 +20,10 @@ async fn multi_bindings(Json(msg): Json<OrderEvent>) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let _server = RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
+    RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::External)
-        .add_service(MultiBindingsConsumer::new().with_state(()))
-        .run().await;
+        .add_service(multi_bindings)
+        .run()
+        .await?;
     Ok(())
 }

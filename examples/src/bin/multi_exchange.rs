@@ -24,9 +24,10 @@ async fn multi_exchange_handler(Json(msg): Json<OrderEvent>) -> Result<(), Error
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let _server = RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
+    RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(MultiExchangeHandlerConsumer::new().with_state(()))
-        .run().await;
+        .add_service(multi_exchange_handler)
+        .run()
+        .await?;
     Ok(())
 }

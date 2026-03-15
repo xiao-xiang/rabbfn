@@ -17,8 +17,10 @@ async fn task_worker(Json(task): Json<TaskPayload>) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let _server = RabbitMqServer::new("amqp://guest:guest@www.soyue.top/")
+    RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(TaskWorkerConsumer::new().with_state(()));
+        .add_service(task_worker)
+        .run()
+        .await?;
     Ok(())
 }

@@ -18,9 +18,10 @@ async fn sms_worker(Json(msg): Json<NotifyPayload>) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let _server = RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
+    RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(SmsWorkerConsumer::new().with_state(()))
-        .run().await;
+        .add_service(sms_worker)
+        .run()
+        .await?;
     Ok(())
 }

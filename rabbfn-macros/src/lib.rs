@@ -362,7 +362,11 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let fn_name = &input_fn.sig.ident;
     let struct_name = syn::Ident::new(&format!("{}Consumer", to_pascal_case(&fn_name.to_string())), fn_name.span());
+    let handler_fn_name = syn::Ident::new(&format!("__rabbfn_handler_{}", fn_name), fn_name.span());
+    let with_state_fn_name = syn::Ident::new(&format!("{}_with_state", fn_name), fn_name.span());
     let fn_vis = &input_fn.vis;
+    let mut handler_fn = input_fn.clone();
+    handler_fn.sig.ident = handler_fn_name.clone();
 
     let queue = args.queue;
     let concurrency = args.concurrency;
@@ -428,7 +432,7 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
     });
 
     let expanded = quote! {
-        #input_fn
+        #handler_fn
 
         #[derive(Clone)]
         #fn_vis struct #struct_name<S> {
@@ -444,6 +448,13 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
                 self.state = Some(state);
                 self
             }
+        }
+
+        #[allow(non_upper_case_globals)]
+        #fn_vis const #fn_name: #struct_name<()> = #struct_name { state: Some(()) };
+
+        #fn_vis fn #with_state_fn_name<S>(state: S) -> #struct_name<S> {
+            #struct_name::new().with_state(state)
         }
         
         impl<S> rabbfn::config::ConsumerConfig for #struct_name<S> {
@@ -503,7 +514,7 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             fn call(&mut self, req: rabbfn::service::MqRequest) -> Self::Future {
-                let handler = #fn_name;
+                let handler = #handler_fn_name;
                 let state = self.state.clone().expect("State must be injected using with_state()");
                 
                 Box::pin(async move {

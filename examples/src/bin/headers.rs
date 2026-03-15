@@ -28,9 +28,10 @@ async fn headers_handler(Json(msg): Json<HeaderEvent>) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let _server = RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
+    RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(HeadersHandlerConsumer::new().with_state(()))
-        .run().await;
+        .add_service(headers_handler)
+        .run()
+        .await?;
     Ok(())
 }
