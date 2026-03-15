@@ -20,7 +20,7 @@ async fn order_topic(Json(msg): Json<OrderEvent>) -> Result<(), Error> {
 async fn main() -> Result<(), Error> {
     RabbitMqServer::new("amqp://licong:18258453478lc@www.soyue.top:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(order_topic)
+        .add_consumer(order_topic)
         .run()
         .await?;
     Ok(())

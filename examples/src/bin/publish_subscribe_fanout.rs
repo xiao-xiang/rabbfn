@@ -20,7 +20,7 @@ async fn sms_worker(Json(msg): Json<NotifyPayload>) -> Result<(), Error> {
 async fn main() -> Result<(), Error> {
     RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(sms_worker)
+        .add_consumer(sms_worker)
         .run()
         .await?;
     Ok(())

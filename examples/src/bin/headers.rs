@@ -30,7 +30,7 @@ async fn headers_handler(Json(msg): Json<HeaderEvent>) -> Result<(), Error> {
 async fn main() -> Result<(), Error> {
     RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(headers_handler)
+        .add_consumer(headers_handler)
         .run()
         .await?;
     Ok(())

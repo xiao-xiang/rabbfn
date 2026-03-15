@@ -20,7 +20,7 @@ async fn pay_success(Json(msg): Json<PayEvent>) -> Result<(), Error> {
 async fn main() -> Result<(), Error> {
     RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(pay_success)
+        .add_consumer(pay_success)
         .run()
         .await?;
     Ok(())

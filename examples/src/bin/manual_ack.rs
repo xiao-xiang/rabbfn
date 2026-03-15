@@ -39,7 +39,7 @@ async fn ack_handler(
 async fn main() -> Result<(), Error> {
     RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(ack_handler)
+        .add_consumer(ack_handler)
         .run()
         .await?;
     Ok(())

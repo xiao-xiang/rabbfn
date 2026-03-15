@@ -26,7 +26,7 @@ async fn multi_exchange_handler(Json(msg): Json<OrderEvent>) -> Result<(), Error
 async fn main() -> Result<(), Error> {
     RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(multi_exchange_handler)
+        .add_consumer(multi_exchange_handler)
         .run()
         .await?;
     Ok(())

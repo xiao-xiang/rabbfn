@@ -45,7 +45,7 @@ async fn rpc_create_order(
 async fn main() -> Result<(), Error> {
     RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(rpc_create_order)
+        .add_consumer(rpc_create_order)
         .run()
         .await?;
     Ok(())

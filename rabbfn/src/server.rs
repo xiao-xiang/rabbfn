@@ -38,7 +38,7 @@ impl RabbitMqServer {
         self
     }
 
-    pub fn add_service<S>(mut self, service: S) -> Self
+    pub fn add_consumer<S>(mut self, service: S) -> Self
     where
         S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
         S::Future: Send + 'static,

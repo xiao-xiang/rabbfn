@@ -22,7 +22,7 @@ async fn multi_bindings(Json(msg): Json<OrderEvent>) -> Result<(), Error> {
 async fn main() -> Result<(), Error> {
     RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::External)
-        .add_service(multi_bindings)
+        .add_consumer(multi_bindings)
         .run()
         .await?;
     Ok(())
