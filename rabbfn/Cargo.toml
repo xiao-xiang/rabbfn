@@ -1,6 +1,7 @@
 [package]
 name = "rabbfn"
 version = "0.1.0"
+description = "A function-first RabbitMQ consumer framework for Rust."
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
