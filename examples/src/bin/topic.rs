@@ -28,7 +28,7 @@ async fn order_topic_test(State(source): State<String>, Json(msg): Json<OrderEve
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    RabbitMqServer::new("amqp://licong:18258453478lc@www.soyue.top:5672/%2f")
+    RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
         .add_consumer(order_topic)
         .with_state("topic-consumer".to_string())
