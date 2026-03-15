@@ -1,11 +1,11 @@
-## RabbitMQ Usage Guide and Full-Pattern Demo
+## RabbitMQ 使用说明与全模式 Demo
 
-### Startup Modes
+### 启动方式
 
-`rabbitmq-server` supports two topology modes:
+`rabbitmq-server` 支持两种拓扑模式：
 
-- `TopologyMode::Managed`: declare exchange/queue/binding automatically when the app starts.
-- `TopologyMode::External`: topology is pre-created by external systems, and the app only consumes.
+- `TopologyMode::Managed`：应用启动时自动声明 exchange/queue/binding。
+- `TopologyMode::External`：拓扑由外部系统预建，应用只消费。
 
 ```rust
 use rabbitmq_server::{RabbitMqServer, TopologyMode};
@@ -14,9 +14,9 @@ let server = RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
     .with_topology_mode(TopologyMode::Managed);
 ```
 
-### Parameter Style
+### 参数风格
 
-It is recommended to use `queue(...)` consistently:
+推荐统一使用 `queue(...)`：
 
 ```rust
 #[consumer(
@@ -29,13 +29,13 @@ async fn handle(Json(msg): Json<OrderCreated>) -> Result<(), Error> {
 }
 ```
 
-Notes for the `exchanges` parameter:
+关于 `exchanges` 参数说明：
 
-- Use `exchanges = [ (...), (...) ]` in macro arguments.
-- Each list item uses named arguments: `(name = "...", kind = "...", ...)`.
-- The same syntax works for both single and multiple exchanges.
+- 宏参数统一使用 `exchanges = [ (...), (...) ]`
+- 每个列表项为命名参数风格：`(name = "...", kind = "...", ...)`
+- 支持单个与多个 exchange，统一同一种写法
 
-Example for multiple exchanges:
+多 exchange 场景示例：
 
 ```rust
 #[consumer(
@@ -55,12 +55,12 @@ async fn multi_exchange_handler(Json(msg): Json<OrderEvent>) -> Result<(), Error
 }
 ```
 
-Practical recommendations:
+实践建议：
 
-- With 2–3 exchanges, `exchanges=[(...),(...)]` is usually readable.
-- For many exchanges (for example, >3), prefer external topology management (`TopologyMode::External`) and keep only consume/binding semantics in macros to avoid overly long annotations.
+- 2~3 个 exchange 时，`exchanges=[(...),(...)]` 可读性较好。
+- exchange 数量较多（例如 >3）时，建议用外部拓扑管理（`TopologyMode::External`），业务宏里只保留消费与绑定语义，避免注解过长。
 
-Default values for fields not explicitly set in `queue`:
+`queue` 中未显式填写的字段使用默认值：
 
 - `passive=false`
 - `durable=true`
@@ -72,7 +72,7 @@ Default values for fields not explicitly set in `queue`:
 
 ---
 
-### 1) Work Queue (Simple Queue / Competing Consumers)
+### 1) Work Queue（简单队列/竞争消费）
 
 ```rust
 #[consumer(
@@ -85,7 +85,7 @@ async fn task_worker(Json(task): Json<TaskPayload>) -> Result<(), Error> {
 }
 ```
 
-### 2) Publish/Subscribe (Fanout Broadcast)
+### 2) Publish/Subscribe（Fanout 广播）
 
 ```rust
 #[consumer(
@@ -99,7 +99,7 @@ async fn sms_worker(Json(msg): Json<NotifyPayload>) -> Result<(), Error> {
 }
 ```
 
-### 3) Routing (Direct Routing)
+### 3) Routing（Direct 路由）
 
 ```rust
 #[consumer(
@@ -113,7 +113,7 @@ async fn pay_success(Json(msg): Json<PayEvent>) -> Result<(), Error> {
 }
 ```
 
-### 4) Topic (Wildcard Routing)
+### 4) Topic（通配路由）
 
 ```rust
 #[consumer(
@@ -127,7 +127,7 @@ async fn order_topic(Json(msg): Json<OrderEvent>) -> Result<(), Error> {
 }
 ```
 
-### 5) Headers (Header Matching)
+### 5) Headers（Header 匹配）
 
 ```rust
 #[consumer(
@@ -144,7 +144,7 @@ async fn headers_handler(Json(msg): Json<HeaderEvent>) -> Result<(), Error> {
 }
 ```
 
-### 6) RPC (Request-Response)
+### 6) RPC（请求-响应）
 
 ```rust
 #[consumer(
@@ -171,11 +171,9 @@ async fn rpc_create_order(
 }
 ```
 
-### 6.1) Manual Ack
+### 6.1) 手动 Ack（Manual Ack）
 
-To use manual ack, set `consume_options(no_ack = false)` (the default is also `false`).  
-The framework automatically acks on handler success and nacks on failure.  
-If you manually ack/nack in your handler, make sure your team has a clear convention to avoid duplicate acknowledgements.
+使用手动 Ack 时，配置 `consume_options(no_ack = false)` 即可（默认也是 false），框架会在 handler 成功后自动 ack、失败时自动 nack。若你在 handler 中手动 ack/nack，请确保业务约定一致，避免重复确认：
 
 ```rust
 #[consumer(
@@ -208,12 +206,12 @@ async fn ack_handler(
 }
 ```
 
-Notes:
+注意：
 
-- `no_ack = true` means broker auto-ack; neither framework nor business code should ack/nack.
-- When `no_ack = false`, the framework automatically ack/nack based on handler result by default.
+- `no_ack = true` 表示 broker 自动确认，框架与业务代码都不应再 ack/nack。
+- `no_ack = false` 时，框架默认会根据 handler 结果自动 ack/nack。
 
-### 7) DLX / TTL / Delay (Dead Letter and Delay)
+### 7) DLX / TTL / Delay（死信与延迟）
 
 ```rust
 #[consumer(
@@ -232,7 +230,7 @@ async fn delay_consumer(Json(msg): Json<OrderDelayMsg>) -> Result<(), Error> {
 
 ---
 
-### bindings List Syntax (Recommended)
+### bindings 列表语法（推荐）
 
 ```rust
 #[consumer(

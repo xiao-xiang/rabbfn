@@ -13,5 +13,4 @@ tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 lapin = { workspace = true }
-tower = { workspace = true }
 rabbfn = { path = "../rabbfn" }
