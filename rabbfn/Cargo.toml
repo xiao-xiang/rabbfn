@@ -10,16 +10,11 @@ rust-version.workspace = true
 
 [dependencies]
 tokio = { workspace = true }
-tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+rabbitmq_macros = { workspace = true }
 async-trait = "0.1"
 futures = "0.3"
 thiserror = "1.0"
 lapin = "2.3.1"
 tower = { version = "0.4", features = ["full"] }
-tower-layer = "0.3"
-tower-service = "0.3"
-opentelemetry = { version = "0.20", features = ["rt-tokio"] }
-tracing-opentelemetry = "0.21"
-pin-project = "1.1"

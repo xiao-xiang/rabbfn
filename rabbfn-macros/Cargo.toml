@@ -1,5 +1,5 @@
 [package]
-name = "rabbfn-macros"
+name = "rabbitmq_macros"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -15,4 +15,3 @@ proc-macro = true
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
-darling = "0.20"
