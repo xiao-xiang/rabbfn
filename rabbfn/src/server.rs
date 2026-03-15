@@ -7,10 +7,12 @@ use crate::service::MqRequest;
 use crate::extract::{Error, MqContext};
 use tower::util::BoxCloneService;
 use crate::config::{ConsumerConfig, BindingConfig, QosConfig, QueueConfig, ExchangeConfig, ConsumeConfig, TopologyMode};
+use crate::state::StateStore;
 
 pub struct RabbitMqServer {
     url: String,
     topology_mode: TopologyMode,
+    global_states: StateStore,
     consumers: Vec<ConsumerDescriptor>,
 }
 
@@ -21,7 +23,13 @@ struct ConsumerDescriptor {
     qos: QosConfig,
     consume_config: ConsumeConfig,
     bindings: Vec<BindingConfig>,
+    local_states: StateStore,
     service: BoxCloneService<MqRequest, (), Error>,
+}
+
+pub struct ConsumerChain {
+    server: RabbitMqServer,
+    consumer_index: usize,
 }
 
 impl RabbitMqServer {
@@ -29,6 +37,7 @@ impl RabbitMqServer {
         Self {
             url: url.into(),
             topology_mode: TopologyMode::Managed,
+            global_states: StateStore::new(),
             consumers: Vec::new(),
         }
     }
@@ -38,7 +47,35 @@ impl RabbitMqServer {
         self
     }
 
-    pub fn add_consumer<S>(mut self, service: S) -> Self
+    pub fn with_state<T>(mut self, state: T) -> Self
+    where
+        T: Send + Sync + 'static,
+    {
+        self.global_states.insert(state);
+        self
+    }
+
+    pub fn add_consumer<S>(mut self, service: S) -> ConsumerChain
+    where
+        S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
+        S::Future: Send + 'static,
+    {
+        let consumer_index = self.push_consumer(service);
+        ConsumerChain {
+            server: self,
+            consumer_index,
+        }
+    }
+
+    pub fn add_service<S>(self, service: S) -> ConsumerChain
+    where
+        S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
+        S::Future: Send + 'static,
+    {
+        self.add_consumer(service)
+    }
+
+    fn push_consumer<S>(&mut self, service: S) -> usize
     where
         S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
         S::Future: Send + 'static,
@@ -49,8 +86,8 @@ impl RabbitMqServer {
         let qos = service.qos();
         let consume_config = service.consume_config();
         let bindings = service.bindings();
-        
         let boxed_svc = BoxCloneService::new(service);
+
         self.consumers.push(ConsumerDescriptor {
             queue_config,
             exchanges,
@@ -58,9 +95,10 @@ impl RabbitMqServer {
             qos,
             consume_config,
             bindings,
+            local_states: StateStore::new(),
             service: boxed_svc,
         });
-        self
+        self.consumers.len() - 1
     }
 
     pub async fn run(self) -> Result<(), Error> {
@@ -118,11 +156,15 @@ impl RabbitMqServer {
         let mut handles = Vec::new();
 
         for consumer in self.consumers {
+            let mut merged_states = self.global_states.clone();
+            merged_states.merge_from(&consumer.local_states);
+
             for i in 0..consumer.concurrency {
                 let conn = conn.clone();
                 let queue = consumer.queue_config.name.clone();
                 let qos = consumer.qos.clone();
                 let consume_config = consumer.consume_config.clone();
+                let states = merged_states.clone();
                 let mut service = consumer.service.clone();
                 let tag = if consume_config.consumer_tag.is_empty() {
                     format!("{}_{}", queue, i)
@@ -153,6 +195,7 @@ impl RabbitMqServer {
                                          context: MqContext {
                                              delivery: Some(delivery),
                                              channel: Some(channel.clone()),
+                                             states: states.clone(),
                                          }
                                      };
 
@@ -191,6 +234,52 @@ impl RabbitMqServer {
         }
 
         Ok(())
+    }
+}
+
+impl ConsumerChain {
+    pub fn with_state<T>(mut self, state: T) -> Self
+    where
+        T: Send + Sync + 'static,
+    {
+        if let Some(consumer) = self.server.consumers.get_mut(self.consumer_index) {
+            consumer.local_states.insert(state);
+        }
+        self
+    }
+
+    pub fn with_server_state<T>(mut self, state: T) -> Self
+    where
+        T: Send + Sync + 'static,
+    {
+        self.server.global_states.insert(state);
+        self
+    }
+
+    pub fn with_topology_mode(mut self, mode: TopologyMode) -> Self {
+        self.server.topology_mode = mode;
+        self
+    }
+
+    pub fn add_consumer<S>(mut self, service: S) -> Self
+    where
+        S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
+        S::Future: Send + 'static,
+    {
+        self.consumer_index = self.server.push_consumer(service);
+        self
+    }
+
+    pub fn add_service<S>(self, service: S) -> Self
+    where
+        S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
+        S::Future: Send + 'static,
+    {
+        self.add_consumer(service)
+    }
+
+    pub async fn run(self) -> Result<(), Error> {
+        self.server.run().await
     }
 }
 

@@ -3,8 +3,8 @@ use crate::extract::{MqContext, FromMessage, Error};
 use std::future::Future;
 
 #[async_trait]
-pub trait Handler<S, Args>: Clone + Send + Sync + 'static {
-    async fn call(&self, ctx: MqContext, state: S) -> Result<(), Error>;
+pub trait Handler<Args>: Clone + Send + Sync + 'static {
+    async fn call(&self, ctx: MqContext) -> Result<(), Error>;
 }
 
 // 宏实现 Handler Trait for Fn
@@ -12,17 +12,16 @@ macro_rules! impl_handler {
     ( $($ty:ident),* ) => {
         #[allow(non_snake_case)]
         #[async_trait]
-        impl<F, Fut, S, $($ty,)*> Handler<S, ($($ty,)*)> for F
+        impl<F, Fut, $($ty,)*> Handler<($($ty,)*)> for F
         where
             F: Fn($($ty,)*) -> Fut + Clone + Send + Sync + 'static,
             Fut: Future<Output = Result<(), Error>> + Send,
-            S: Clone + Send + Sync + 'static,
-            $( $ty: FromMessage<S> + Send, )*
+            $( $ty: FromMessage + Send, )*
         {
             #[allow(unused_mut, unused_variables)]
-            async fn call(&self, mut ctx: MqContext, state: S) -> Result<(), Error> {
+            async fn call(&self, mut ctx: MqContext) -> Result<(), Error> {
                 $(
-                    let $ty = $ty::from_message(&mut ctx, &state).await?;
+                    let $ty = $ty::from_message(&mut ctx).await?;
                 )*
                 (self)($($ty,)*).await
             }

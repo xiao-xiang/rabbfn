@@ -3,6 +3,7 @@ use lapin::Channel;
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
+use crate::state::StateStore;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("JSON error: {0}")]
@@ -16,6 +17,7 @@ pub enum Error {
 pub struct MqContext {
     pub delivery: Option<Delivery>,
     pub channel: Option<Channel>,
+    pub states: StateStore,
 }
 
 impl MqContext {
@@ -25,8 +27,8 @@ impl MqContext {
 }
 
 #[async_trait]
-pub trait FromMessage<S>: Sized {
-    async fn from_message(ctx: &mut MqContext, state: &S) -> Result<Self, Error>;
+pub trait FromMessage: Sized {
+    async fn from_message(ctx: &mut MqContext) -> Result<Self, Error>;
 }
 
 // 1. State 提取器
@@ -34,9 +36,15 @@ pub trait FromMessage<S>: Sized {
 pub struct State<S>(pub S);
 
 #[async_trait]
-impl<S: Clone + Send + Sync> FromMessage<S> for State<S> {
-    async fn from_message(_ctx: &mut MqContext, state: &S) -> Result<Self, Error> {
-        Ok(State(state.clone()))
+impl<S> FromMessage for State<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    async fn from_message(ctx: &mut MqContext) -> Result<Self, Error> {
+        ctx.states
+            .get::<S>()
+            .map(State)
+            .ok_or_else(|| Error::Other(format!("State not found: {}", std::any::type_name::<S>())))
     }
 }
 
@@ -44,8 +52,8 @@ impl<S: Clone + Send + Sync> FromMessage<S> for State<S> {
 pub struct RawDelivery(pub Delivery);
 
 #[async_trait]
-impl<S: Send + Sync> FromMessage<S> for RawDelivery {
-    async fn from_message(ctx: &mut MqContext, _state: &S) -> Result<Self, Error> {
+impl FromMessage for RawDelivery {
+    async fn from_message(ctx: &mut MqContext) -> Result<Self, Error> {
         Ok(RawDelivery(ctx.take_delivery()?))
     }
 }
@@ -54,19 +62,8 @@ impl<S: Send + Sync> FromMessage<S> for RawDelivery {
 pub struct Json<T>(pub T);
 
 #[async_trait]
-impl<T: DeserializeOwned + Send, S: Send + Sync> FromMessage<S> for Json<T> {
-    async fn from_message(ctx: &mut MqContext, _state: &S) -> Result<Self, Error> {
-        // We need to access delivery data.
-        // If delivery is already taken, we fail?
-        // Ideally we should peek.
-        // But if RawDelivery took it, we can't peek.
-        // Axum solves this by enforcing order or cloning body (Bytes is cheap clone).
-        // Delivery is not cheap clone.
-        // But Delivery.data is Vec<u8>.
-        // We should probably just clone the data?
-        // But we can't clone Delivery.
-        
-        // For now, let's assume we can reference it if it's there.
+impl<T: DeserializeOwned + Send> FromMessage for Json<T> {
+    async fn from_message(ctx: &mut MqContext) -> Result<Self, Error> {
         if let Some(delivery) = &ctx.delivery {
              serde_json::from_slice(&delivery.data)
                 .map(Json)
@@ -79,8 +76,8 @@ impl<T: DeserializeOwned + Send, S: Send + Sync> FromMessage<S> for Json<T> {
 
 // 4. Channel 提取器
 #[async_trait]
-impl<S: Send + Sync> FromMessage<S> for Channel {
-    async fn from_message(ctx: &mut MqContext, _state: &S) -> Result<Self, Error> {
+impl FromMessage for Channel {
+    async fn from_message(ctx: &mut MqContext) -> Result<Self, Error> {
         ctx.channel.clone().ok_or_else(|| Error::Other("Channel not available".to_string()))
     }
 }

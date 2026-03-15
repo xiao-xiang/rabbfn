@@ -16,22 +16,20 @@ use std::marker::PhantomData;
 
 // 包装 Handler 的 Service
 #[derive(Clone)]
-pub struct HandlerService<H, S, Args> {
+pub struct HandlerService<H, Args> {
     handler: H,
-    state: S,
     _marker: PhantomData<Args>,
 }
 
-impl<H, S, Args> HandlerService<H, S, Args> {
-    pub fn new(handler: H, state: S) -> Self {
-        Self { handler, state, _marker: PhantomData }
+impl<H, Args> HandlerService<H, Args> {
+    pub fn new(handler: H) -> Self {
+        Self { handler, _marker: PhantomData }
     }
 }
 
-impl<H, S, Args> Service<MqRequest> for HandlerService<H, S, Args>
+impl<H, Args> Service<MqRequest> for HandlerService<H, Args>
 where
-    H: Handler<S, Args> + Clone + Send + Sync + 'static,
-    S: Clone + Send + Sync + 'static,
+    H: Handler<Args> + Clone + Send + Sync + 'static,
     Args: Send + Sync + 'static,
 {
     type Response = ();
@@ -44,11 +42,10 @@ where
 
     fn call(&mut self, req: MqRequest) -> Self::Future {
         let handler = self.handler.clone();
-        let state = self.state.clone();
         let ctx = req.context;
 
         Box::pin(async move {
-            handler.call(ctx, state).await
+            handler.call(ctx).await
         })
     }
 }

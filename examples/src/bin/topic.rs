@@ -1,5 +1,5 @@
 use rabbfn::extract::Error;
-use rabbfn::{Json, RabbitMqServer, TopologyMode, consumer};
+use rabbfn::{Json, RabbitMqServer, State, TopologyMode, consumer};
 
 #[derive(Debug, serde::Deserialize)]
 struct OrderEvent {
@@ -11,8 +11,18 @@ struct OrderEvent {
     exchanges = [(name = "order.topic", kind = "topic")],
     bindings = [(exchange = "order.topic", routing_key = "order.*")]
 )]
-async fn order_topic(Json(msg): Json<OrderEvent>) -> Result<(), Error> {
-    println!("topic={}", msg.event_name);
+async fn order_topic(State(source): State<String>, Json(msg): Json<OrderEvent>) -> Result<(), Error> {
+    println!("topic={} source={}", msg.event_name, source);
+    Ok(())
+}
+
+#[consumer(
+    queue(name = "order.topic.a"),
+    exchanges = [(name = "order.topic", kind = "topic")],
+    bindings = [(exchange = "order.topic", routing_key = "order.*")]
+)]
+async fn order_topic_test(State(source): State<String>, Json(msg): Json<OrderEvent>) -> Result<(), Error> {
+    println!("topic={} source={}", msg.event_name, source);
     Ok(())
 }
 
@@ -21,6 +31,8 @@ async fn main() -> Result<(), Error> {
     RabbitMqServer::new("amqp://licong:18258453478lc@www.soyue.top:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
         .add_consumer(order_topic)
+        .with_state("topic-consumer".to_string())
+        .add_consumer(order_topic_test).with_state("topic-test".to_string())
         .run()
         .await?;
     Ok(())

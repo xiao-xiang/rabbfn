@@ -363,7 +363,6 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_name = &input_fn.sig.ident;
     let struct_name = syn::Ident::new(&format!("{}Consumer", to_pascal_case(&fn_name.to_string())), fn_name.span());
     let handler_fn_name = syn::Ident::new(&format!("__rabbfn_handler_{}", fn_name), fn_name.span());
-    let with_state_fn_name = syn::Ident::new(&format!("{}_with_state", fn_name), fn_name.span());
     let fn_vis = &input_fn.vis;
     let mut handler_fn = input_fn.clone();
     handler_fn.sig.ident = handler_fn_name.clone();
@@ -434,30 +433,13 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #handler_fn
 
-        #[derive(Clone)]
-        #fn_vis struct #struct_name<S> {
-            state: Option<S>,
-        }
-
-        impl<S> #struct_name<S> {
-            pub fn new() -> Self {
-                Self { state: None }
-            }
-            
-            pub fn with_state(mut self, state: S) -> Self {
-                self.state = Some(state);
-                self
-            }
-        }
+        #[derive(Clone, Copy)]
+        #fn_vis struct #struct_name;
 
         #[allow(non_upper_case_globals)]
-        #fn_vis const #fn_name: #struct_name<()> = #struct_name { state: Some(()) };
-
-        #fn_vis fn #with_state_fn_name<S>(state: S) -> #struct_name<S> {
-            #struct_name::new().with_state(state)
-        }
+        #fn_vis const #fn_name: #struct_name = #struct_name;
         
-        impl<S> rabbfn::config::ConsumerConfig for #struct_name<S> {
+        impl rabbfn::config::ConsumerConfig for #struct_name {
             fn queue_config(&self) -> rabbfn::config::QueueConfig {
                 rabbfn::config::QueueConfig {
                     name: #queue.to_string(),
@@ -501,10 +483,7 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl<S> tower::Service<rabbfn::service::MqRequest> for #struct_name<S>
-        where
-            S: Clone + Send + Sync + 'static,
-        {
+        impl tower::Service<rabbfn::service::MqRequest> for #struct_name {
             type Response = ();
             type Error = rabbfn::extract::Error;
             type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Self::Error>> + Send>>;
@@ -515,10 +494,8 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
 
             fn call(&mut self, req: rabbfn::service::MqRequest) -> Self::Future {
                 let handler = #handler_fn_name;
-                let state = self.state.clone().expect("State must be injected using with_state()");
-                
                 Box::pin(async move {
-                    rabbfn::handler::Handler::call(&handler, req.context, state).await
+                    rabbfn::handler::Handler::call(&handler, req.context).await
                 })
             }
         }
