@@ -6,7 +6,7 @@ use tower::{Service, ServiceExt};
 use crate::service::MqRequest;
 use crate::extract::{Error, MqContext};
 use tower::util::BoxCloneService;
-use crate::config::{ConsumerConfig, BindingConfig, QosConfig, QueueConfig, ExchangeConfig, ConsumeConfig, TopologyMode};
+use crate::config::{BindingConfig, QosConfig, QueueConfig, ExchangeConfig, ConsumeConfig, TopologyMode, ConsumerDefinition, IntoConsumerDefinition};
 use crate::state::StateStore;
 
 pub struct RabbitMqServer {
@@ -55,48 +55,34 @@ impl RabbitMqServer {
         self
     }
 
-    pub fn add_consumer<S>(mut self, service: S) -> ConsumerChain
+    pub fn add_consumer<D>(mut self, definition: D) -> ConsumerChain
     where
-        S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
-        S::Future: Send + 'static,
+        D: IntoConsumerDefinition,
     {
-        let consumer_index = self.push_consumer(service);
+        let consumer_index = self.push_consumer(definition.into_definition());
         ConsumerChain {
             server: self,
             consumer_index,
         }
     }
 
-    pub fn add_service<S>(self, service: S) -> ConsumerChain
+    pub fn add_service<D>(self, definition: D) -> ConsumerChain
     where
-        S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
-        S::Future: Send + 'static,
+        D: IntoConsumerDefinition,
     {
-        self.add_consumer(service)
+        self.add_consumer(definition)
     }
 
-    fn push_consumer<S>(&mut self, service: S) -> usize
-    where
-        S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
-        S::Future: Send + 'static,
-    {
-        let queue_config = service.queue_config();
-        let exchanges = service.exchanges();
-        let concurrency = service.concurrency();
-        let qos = service.qos();
-        let consume_config = service.consume_config();
-        let bindings = service.bindings();
-        let boxed_svc = BoxCloneService::new(service);
-
+    fn push_consumer(&mut self, definition: ConsumerDefinition) -> usize {
         self.consumers.push(ConsumerDescriptor {
-            queue_config,
-            exchanges,
-            concurrency,
-            qos,
-            consume_config,
-            bindings,
+            queue_config: definition.queue_config,
+            exchanges: definition.exchanges,
+            concurrency: definition.concurrency,
+            qos: definition.qos,
+            consume_config: definition.consume_config,
+            bindings: definition.bindings,
             local_states: StateStore::new(),
-            service: boxed_svc,
+            service: definition.service,
         });
         self.consumers.len() - 1
     }
@@ -174,7 +160,7 @@ impl RabbitMqServer {
 
                 let handle = tokio::spawn(async move {
                     if let Ok(channel) = conn.create_channel().await {
-                         let _ = channel.basic_qos(qos.prefetch_count, BasicQosOptions { global: qos.global, ..Default::default() }).await;
+                         let _ = channel.basic_qos(qos.prefetch_count, BasicQosOptions { global: qos.global }).await;
                          let stream_res = channel.basic_consume(
                              &queue,
                              &tag,
@@ -261,21 +247,19 @@ impl ConsumerChain {
         self
     }
 
-    pub fn add_consumer<S>(mut self, service: S) -> Self
+    pub fn add_consumer<D>(mut self, definition: D) -> Self
     where
-        S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
-        S::Future: Send + 'static,
+        D: IntoConsumerDefinition,
     {
-        self.consumer_index = self.server.push_consumer(service);
+        self.consumer_index = self.server.push_consumer(definition.into_definition());
         self
     }
 
-    pub fn add_service<S>(self, service: S) -> Self
+    pub fn add_service<D>(self, definition: D) -> Self
     where
-        S: Service<MqRequest, Response = (), Error = Error> + ConsumerConfig + Clone + Send + Sync + 'static,
-        S::Future: Send + 'static,
+        D: IntoConsumerDefinition,
     {
-        self.add_consumer(service)
+        self.add_consumer(definition)
     }
 
     pub async fn run(self) -> Result<(), Error> {

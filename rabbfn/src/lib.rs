@@ -7,8 +7,8 @@ pub mod state;
 
 pub use rabbfn_macros::consumer;
 pub use server::RabbitMqServer;
+pub use config::ConsumerDefinition;
 pub use config::TopologyMode;
 pub use extract::MqContext;
 pub use extract::Json;
 pub use extract::State;
-

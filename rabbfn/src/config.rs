@@ -3,9 +3,7 @@ use crate::extract::Error;
 use lapin::types::FieldTable;
 use std::str::FromStr;
 
-// 一个用于包装 HandlerService 的类型擦除 Service
-// 用于在 Server 中存储不同类型的 HandlerService
-pub type BoxMqService = tower::util::BoxService<MqRequest, (), Error>;
+pub type BoxMqService = tower::util::BoxCloneService<MqRequest, (), Error>;
 
 #[derive(Clone, Debug)]
 pub struct BindingConfig {
@@ -119,12 +117,31 @@ impl Default for ConsumeConfig {
     }
 }
 
-// 定义消费者配置 Trait
-pub trait ConsumerConfig {
-    fn queue_config(&self) -> QueueConfig;
-    fn exchanges(&self) -> Vec<ExchangeConfig>;
-    fn concurrency(&self) -> usize;
-    fn qos(&self) -> QosConfig;
-    fn consume_config(&self) -> ConsumeConfig;
-    fn bindings(&self) -> Vec<BindingConfig>;
+pub struct ConsumerDefinition {
+    pub queue_config: QueueConfig,
+    pub exchanges: Vec<ExchangeConfig>,
+    pub concurrency: usize,
+    pub qos: QosConfig,
+    pub consume_config: ConsumeConfig,
+    pub bindings: Vec<BindingConfig>,
+    pub service: BoxMqService,
+}
+
+pub trait IntoConsumerDefinition {
+    fn into_definition(self) -> ConsumerDefinition;
+}
+
+impl IntoConsumerDefinition for ConsumerDefinition {
+    fn into_definition(self) -> ConsumerDefinition {
+        self
+    }
+}
+
+impl<F> IntoConsumerDefinition for F
+where
+    F: FnOnce() -> ConsumerDefinition,
+{
+    fn into_definition(self) -> ConsumerDefinition {
+        self()
+    }
 }

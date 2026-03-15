@@ -15,10 +15,21 @@ use std::marker::PhantomData;
 // ...
 
 // 包装 Handler 的 Service
-#[derive(Clone)]
 pub struct HandlerService<H, Args> {
     handler: H,
     _marker: PhantomData<Args>,
+}
+
+impl<H, Args> Clone for HandlerService<H, Args>
+where
+    H: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            handler: self.handler.clone(),
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<H, Args> HandlerService<H, Args> {

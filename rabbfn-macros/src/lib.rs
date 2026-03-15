@@ -61,21 +61,6 @@ struct BindingSpec {
     arguments: Option<Expr>,
 }
 
-fn to_pascal_case(input: &str) -> String {
-    let mut out = String::new();
-    for part in input.split('_') {
-        if part.is_empty() {
-            continue;
-        }
-        let mut chars = part.chars();
-        if let Some(first) = chars.next() {
-            out.extend(first.to_uppercase());
-            out.push_str(chars.as_str());
-        }
-    }
-    out
-}
-
 impl Default for QosConfig {
     fn default() -> Self {
         Self {
@@ -361,10 +346,9 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = args_parser.parse(args).expect("Failed to parse consumer args");
 
     let fn_name = &input_fn.sig.ident;
-    let struct_name = syn::Ident::new(&format!("{}Consumer", to_pascal_case(&fn_name.to_string())), fn_name.span());
-    let handler_fn_name = syn::Ident::new(&format!("__rabbfn_handler_{}", fn_name), fn_name.span());
     let fn_vis = &input_fn.vis;
     let mut handler_fn = input_fn.clone();
+    let handler_fn_name = syn::Ident::new(&format!("__rabbfn_handler_{}", fn_name), fn_name.span());
     handler_fn.sig.ident = handler_fn_name.clone();
 
     let queue = args.queue;
@@ -433,15 +417,13 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #handler_fn
 
-        #[derive(Clone, Copy)]
-        #fn_vis struct #struct_name;
+        #fn_vis fn #fn_name() -> rabbfn::config::ConsumerDefinition {
+            let service = rabbfn::config::BoxMqService::new(
+                rabbfn::service::HandlerService::new(#handler_fn_name)
+            );
 
-        #[allow(non_upper_case_globals)]
-        #fn_vis const #fn_name: #struct_name = #struct_name;
-        
-        impl rabbfn::config::ConsumerConfig for #struct_name {
-            fn queue_config(&self) -> rabbfn::config::QueueConfig {
-                rabbfn::config::QueueConfig {
+            rabbfn::config::ConsumerDefinition {
+                queue_config: rabbfn::config::QueueConfig {
                     name: #queue.to_string(),
                     passive: #q_passive,
                     durable: #q_durable,
@@ -450,53 +432,27 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
                     nowait: #q_nowait,
                     declare: #q_declare,
                     arguments: #q_arguments,
-                }
-            }
-            fn exchanges(&self) -> Vec<rabbfn::config::ExchangeConfig> {
-                vec![
+                },
+                exchanges: vec![
                     #(#exchanges_code),*
-                ]
-            }
-            fn concurrency(&self) -> usize {
-                #concurrency
-            }
-            fn qos(&self) -> rabbfn::config::QosConfig {
-                rabbfn::config::QosConfig {
+                ],
+                concurrency: #concurrency,
+                qos: rabbfn::config::QosConfig {
                     prefetch_count: #prefetch_count,
                     global: #qos_global,
-                }
-            }
-            fn consume_config(&self) -> rabbfn::config::ConsumeConfig {
-                rabbfn::config::ConsumeConfig {
+                },
+                consume_config: rabbfn::config::ConsumeConfig {
                     consumer_tag: #consume_consumer_tag.to_string(),
                     no_local: #consume_no_local,
                     no_ack: #consume_no_ack,
                     exclusive: #consume_exclusive,
                     nowait: #consume_nowait,
                     arguments: #consume_arguments,
-                }
-            }
-            fn bindings(&self) -> Vec<rabbfn::config::BindingConfig> {
-                vec![
+                },
+                bindings: vec![
                     #(#bindings_code),*
-                ]
-            }
-        }
-
-        impl tower::Service<rabbfn::service::MqRequest> for #struct_name {
-            type Response = ();
-            type Error = rabbfn::extract::Error;
-            type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Self::Error>> + Send>>;
-
-            fn poll_ready(&mut self, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
-                std::task::Poll::Ready(Ok(()))
-            }
-
-            fn call(&mut self, req: rabbfn::service::MqRequest) -> Self::Future {
-                let handler = #handler_fn_name;
-                Box::pin(async move {
-                    rabbfn::handler::Handler::call(&handler, req.context).await
-                })
+                ],
+                service,
             }
         }
     };
