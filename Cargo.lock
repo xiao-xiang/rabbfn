@@ -1350,7 +1350,7 @@ dependencies = [
  "async-trait",
  "futures",
  "lapin",
- "rabbfn_macros",
+ "rabbfn-macros",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -1359,7 +1359,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rabbfn_macros"
+name = "rabbfn-macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",

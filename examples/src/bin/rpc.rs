@@ -1,6 +1,5 @@
-use rabbfn as rabb_fn;
-use rabb_fn::extract::Error;
-use rabb_fn::{Json, RabbitMqServer, TopologyMode, consumer};
+use rabbfn::extract::Error;
+use rabbfn::{Json, RabbitMqServer, TopologyMode, consumer};
 
 #[derive(Debug, serde::Deserialize)]
 struct CreateOrderReq {
@@ -19,7 +18,7 @@ struct CreateOrderResp {
 )]
 async fn rpc_create_order(
     channel: lapin::Channel,
-    raw: rabb_fn::extract::RawDelivery,
+    raw: rabbfn::extract::RawDelivery,
     Json(req): Json<CreateOrderReq>
 ) -> Result<(), Error> {
     let resp = CreateOrderResp {
@@ -46,6 +45,7 @@ async fn rpc_create_order(
 async fn main() -> Result<(), Error> {
     let _server = RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(RpcCreateOrderConsumer::new().with_state(()));
+        .add_service(RpcCreateOrderConsumer::new().with_state(()))
+        .run().await;
     Ok(())
 }

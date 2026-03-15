@@ -1,6 +1,5 @@
-use rabbfn as rabb_fn;
-use rabb_fn::extract::Error;
-use rabb_fn::{Json, RabbitMqServer, TopologyMode, consumer};
+use rabbfn::extract::Error;
+use rabbfn::{Json, RabbitMqServer, TopologyMode, consumer};
 
 #[derive(Debug, serde::Deserialize)]
 struct OrderEvent {
@@ -15,7 +14,7 @@ struct OrderEvent {
     )
 )]
 async fn ack_handler(
-    raw: rabb_fn::extract::RawDelivery,
+    raw: rabbfn::extract::RawDelivery,
     Json(msg): Json<OrderEvent>
 ) -> Result<(), Error> {
     if msg.order_id.is_empty() {
@@ -40,6 +39,7 @@ async fn ack_handler(
 async fn main() -> Result<(), Error> {
     let _server = RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(AckHandlerConsumer::new().with_state(()));
+        .add_service(AckHandlerConsumer::new().with_state(()))
+        .run().await;
     Ok(())
 }

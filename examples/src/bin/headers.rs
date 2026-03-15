@@ -1,6 +1,5 @@
-use rabbfn as rabb_fn;
-use rabb_fn::extract::Error;
-use rabb_fn::{Json, RabbitMqServer, TopologyMode, consumer};
+use rabbfn::extract::Error;
+use rabbfn::{Json, RabbitMqServer, TopologyMode, consumer};
 
 #[derive(Debug, serde::Deserialize)]
 struct HeaderEvent {
@@ -31,6 +30,7 @@ async fn headers_handler(Json(msg): Json<HeaderEvent>) -> Result<(), Error> {
 async fn main() -> Result<(), Error> {
     let _server = RabbitMqServer::new("amqp://guest:guest@127.0.0.1:5672/%2f")
         .with_topology_mode(TopologyMode::Managed)
-        .add_service(HeadersHandlerConsumer::new().with_state(()));
+        .add_service(HeadersHandlerConsumer::new().with_state(()))
+        .run().await;
     Ok(())
 }
