@@ -61,6 +61,21 @@ struct BindingSpec {
     arguments: Option<Expr>,
 }
 
+fn to_pascal_case(input: &str) -> String {
+    let mut out = String::new();
+    for part in input.split('_') {
+        if part.is_empty() {
+            continue;
+        }
+        let mut chars = part.chars();
+        if let Some(first) = chars.next() {
+            out.extend(first.to_uppercase());
+            out.push_str(chars.as_str());
+        }
+    }
+    out
+}
+
 impl Default for QosConfig {
     fn default() -> Self {
         Self {
@@ -346,7 +361,7 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = args_parser.parse(args).expect("Failed to parse consumer args");
 
     let fn_name = &input_fn.sig.ident;
-    let struct_name = syn::Ident::new(&format!("{}Consumer", fn_name), fn_name.span());
+    let struct_name = syn::Ident::new(&format!("{}Consumer", to_pascal_case(&fn_name.to_string())), fn_name.span());
     let fn_vis = &input_fn.vis;
 
     let queue = args.queue;
@@ -380,7 +395,7 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
         let declare = &exchange.options.declare;
         let arguments = &exchange.options.arguments;
         quote! {
-            rabbitmq_server::config::ExchangeConfig {
+            rabbfn::config::ExchangeConfig {
                 name: #name.to_string(),
                 kind: #kind.to_string(),
                 passive: #passive,
@@ -403,7 +418,7 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
             None => quote! { lapin::types::FieldTable::default() },
         };
         quote! {
-            rabbitmq_server::config::BindingConfig {
+            rabbfn::config::BindingConfig {
                 exchange: #ex.to_string(),
                 routing_key: #rk.to_string(),
                 nowait: #nowait,
@@ -431,9 +446,9 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
         
-        impl<S> rabbitmq_server::config::ConsumerConfig for #struct_name<S> {
-            fn queue_config(&self) -> rabbitmq_server::config::QueueConfig {
-                rabbitmq_server::config::QueueConfig {
+        impl<S> rabbfn::config::ConsumerConfig for #struct_name<S> {
+            fn queue_config(&self) -> rabbfn::config::QueueConfig {
+                rabbfn::config::QueueConfig {
                     name: #queue.to_string(),
                     passive: #q_passive,
                     durable: #q_durable,
@@ -444,7 +459,7 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
                     arguments: #q_arguments,
                 }
             }
-            fn exchanges(&self) -> Vec<rabbitmq_server::config::ExchangeConfig> {
+            fn exchanges(&self) -> Vec<rabbfn::config::ExchangeConfig> {
                 vec![
                     #(#exchanges_code),*
                 ]
@@ -452,14 +467,14 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
             fn concurrency(&self) -> usize {
                 #concurrency
             }
-            fn qos(&self) -> rabbitmq_server::config::QosConfig {
-                rabbitmq_server::config::QosConfig {
+            fn qos(&self) -> rabbfn::config::QosConfig {
+                rabbfn::config::QosConfig {
                     prefetch_count: #prefetch_count,
                     global: #qos_global,
                 }
             }
-            fn consume_config(&self) -> rabbitmq_server::config::ConsumeConfig {
-                rabbitmq_server::config::ConsumeConfig {
+            fn consume_config(&self) -> rabbfn::config::ConsumeConfig {
+                rabbfn::config::ConsumeConfig {
                     consumer_tag: #consume_consumer_tag.to_string(),
                     no_local: #consume_no_local,
                     no_ack: #consume_no_ack,
@@ -468,33 +483,31 @@ pub fn consumer(args: TokenStream, input: TokenStream) -> TokenStream {
                     arguments: #consume_arguments,
                 }
             }
-            fn bindings(&self) -> Vec<rabbitmq_server::config::BindingConfig> {
+            fn bindings(&self) -> Vec<rabbfn::config::BindingConfig> {
                 vec![
                     #(#bindings_code),*
                 ]
             }
         }
 
-        impl<S, Args> tower::Service<rabbitmq_server::service::MqRequest> for #struct_name<S>
+        impl<S> tower::Service<rabbfn::service::MqRequest> for #struct_name<S>
         where
             S: Clone + Send + Sync + 'static,
-            Args: Send + Sync + 'static,
-            #fn_name: rabbitmq_server::handler::Handler<S, Args>,
         {
             type Response = ();
-            type Error = rabbitmq_server::extract::Error;
+            type Error = rabbfn::extract::Error;
             type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Self::Error>> + Send>>;
 
             fn poll_ready(&mut self, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
                 std::task::Poll::Ready(Ok(()))
             }
 
-            fn call(&mut self, req: rabbitmq_server::service::MqRequest) -> Self::Future {
-                let handler = #fn_name.clone();
+            fn call(&mut self, req: rabbfn::service::MqRequest) -> Self::Future {
+                let handler = #fn_name;
                 let state = self.state.clone().expect("State must be injected using with_state()");
                 
                 Box::pin(async move {
-                    handler.call(req.context, state).await
+                    rabbfn::handler::Handler::call(&handler, req.context, state).await
                 })
             }
         }

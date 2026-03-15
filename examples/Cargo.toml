@@ -1,5 +1,5 @@
 [package]
-name = "rabbfn"
+name = "examples"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -12,9 +12,6 @@ rust-version.workspace = true
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-rabbfn-macros = { workspace = true }
-async-trait = { workspace = true }
-futures = { workspace = true }
-thiserror = { workspace = true }
 lapin = { workspace = true }
 tower = { workspace = true }
+rabbfn = { path = "../rabbfn" }
