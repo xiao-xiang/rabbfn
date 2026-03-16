@@ -10,7 +10,7 @@ resolver = "3"
 authors = ["1149520393@qq.com"]
 edition = "2024"
 homepage = "https://www.soyue.top"
-repository = "https://www.soyue.top"
+repository = "https://github.com/xiao-xiang/rabbfn.git"
 license = "MIT OR Apache-2.0"
 rust-version = "1.85.0"
 
